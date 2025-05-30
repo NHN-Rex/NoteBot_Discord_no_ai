@@ -37,6 +37,11 @@ if creds_dict:
 else:
     raise Exception("Google Drive credentials JSON not found in environment variables")
 
+# Google Sheets setup
+# scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+# creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+client_gs = gspread.authorize(creds)
+sheet = client_gs.open("chi_tieu_on_dinh").sheet1
 
 # Load slang mapping
 try:
@@ -45,11 +50,7 @@ try:
 except:
     slang_amount_mapping = {}
 
-# Google Sheets setup
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-client_gs = gspread.authorize(creds)
-sheet = client_gs.open("chi_tieu_on_dinh").sheet1
+
 
 # Bot setup
 intents = discord.Intents.default()
