@@ -1,0 +1,7 @@
+discord.py
+flask
+gspread
+oauth2client
+matplotlib
+pandas
+numpy
