@@ -7,7 +7,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 from io import BytesIO
-from flask import Flask
+from flask import Flask, request
 from threading import Thread
 import json, os, sys, re
 import pandas as pd
