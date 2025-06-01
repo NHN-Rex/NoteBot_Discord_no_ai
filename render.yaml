@@ -3,7 +3,7 @@ services:
     name: discord-note-bot
     env: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python main.py"
+    startCommand: "python NoteBotcommand.py"
     envVars:
       - key: NoteBotDiscordToken
         value: ""
