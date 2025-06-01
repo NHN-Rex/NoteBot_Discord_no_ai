@@ -26,15 +26,25 @@ try:
         slang_amount_mapping = json.load(f)
 except:
     slang_amount_mapping = {}
-
 # Google Sheets setup
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
-creds = ServiceAccountCredentials.from_json_keyfile_name(
-    "credentials.json", scope)
+
+
+# sử dụng trên render
+# Lấy nội dung JSON từ biến môi trường
+credentials_info = os.getenv("GOOGLE_CREDENTIALS_JSON")
+# Parse string JSON thành dict
+credentials_dict = json.loads(credentials_info)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
 client_gs = gspread.authorize(creds)
+
+# sử dụng local
+# creds = ServiceAccountCredentials.from_json_keyfile_name(
+#     "credentials.json", scope)
+# client_gs = gspread.authorize(creds)
 sheet = client_gs.open("chi_tieu_on_dinh").sheet1
 
 # Bot setup
