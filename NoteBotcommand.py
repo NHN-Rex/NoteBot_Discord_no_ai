@@ -20,23 +20,36 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Load slang mapping
-def load_slang():
-    try:
-        with open("slang_mapping.json", "r", encoding="utf-8") as f:
-            slang_mapping = json.load(f)
-    except:
-        slang_mapping = {}
+def load_slang_from_sheet(slang_sheet):
+    rows = slang_sheet.get_all_records()
+    slang_mapping = {}
 
-    # chuẩn hoá lại
-    slang_mapping = {k.strip().lower(): v for k, v in slang_mapping.items()}
+    for row in rows:
+        key = row['slang'].strip().lower()
+        type_ = row['type']
+        value_raw = row['value']
+
+        if type_ == "number":
+            value = float(value_raw)
+        elif type_ == "list":
+            value = [v.strip() for v in value_raw.split(",")]
+        else:
+            value = value_raw
+
+        slang_mapping[key] = value
+
     return slang_mapping
 
 def replace_slang(text, mapping):
-        for slang, real_name in mapping.items():
-            text = text.replace(slang, str(real_name))
-        return text
+    # Sắp xếp slang theo độ dài giảm dần để replace từ dài trước
+    sorted_mapping = sorted(mapping.items(), key=lambda x: len(x[0]), reverse=True)
+    
+    for slang, real_value in sorted_mapping:
+        text = text.replace(slang, str(real_value))
+    return text
 
-def update_slang_mapping(message_content, mapping_file="slang_mapping.json"):
+
+def update_slang_mapping_to_sheet(message_content, sheet_slang_mapping):
     # Regex tách dạng "bot ngu: something = something"
     pattern = r"bot ngu:\s*(.+?)\s*=\s*(.+)"
     match = re.match(pattern, message_content, re.IGNORECASE)
@@ -48,21 +61,28 @@ def update_slang_mapping(message_content, mapping_file="slang_mapping.json"):
         # Xác định kiểu dữ liệu của value
         try:
             value = int(value_raw.replace(",", "").replace(".", ""))
+            type_ = "number"
         except ValueError:
-            value = value_raw
+            # Nếu nhập value là list cách nhau bằng dấu ,
+            if "," in value_raw:
+                value = [v.strip() for v in value_raw.split(",")]
+                type_ = "list"
+                value_raw = ",".join(value)  # để lưu lên sheet
+            else:
+                value = value_raw
+                type_ = "string"
 
-        # Load mapping cũ
-        with open(mapping_file, "r", encoding="utf-8") as f:
-            mapping = json.load(f)
+        # Kiểm tra xem key đã tồn tại chưa
+        rows = sheet_slang_mapping.get_all_records()
+        for i, row in enumerate(rows):
+            if row['slang'] == key:
+                sheet_slang_mapping.update_cell(i+2, 2, type_)
+                sheet_slang_mapping.update_cell(i+2, 3, value_raw)
+                return f"Đã cập nhật: '{key}' → '{value_raw}'"
 
-        # Cập nhật
-        mapping[key] = value
-
-        # Ghi lại file
-        with open(mapping_file, "w", encoding="utf-8") as f:
-            json.dump(mapping, f, indent=4, ensure_ascii=False)
-
-        return f"Đã cập nhật: '{key}' → '{value}'"
+        # Nếu chưa có thì thêm mới
+        sheet_slang_mapping.append_row([key, type_, value_raw])
+        return f"Đã thêm mới: '{key}' → '{value_raw}'"
     else:
         return "Cú pháp sai rồi bro! Dùng đúng dạng: bot ngu: cái này = cái kia"
 
@@ -116,13 +136,15 @@ credentials_dict = json.loads(credentials_info)
 creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
 client_gs = gspread.authorize(creds)
 
-# sử dụng local
+# # sử dụng local
 # creds = ServiceAccountCredentials.from_json_keyfile_name(
 #     "credentials.json", scope)
 # client_gs = gspread.authorize(creds)
 
 
-sheet = client_gs.open("chi_tieu_on_dinh").sheet1
+sheet = client_gs.open("chi_tieu_on_dinh")
+sheet_log = sheet.worksheet('log')
+sheet_slang_mapping = sheet.worksheet('slang_mapping')
 
 # Bot setup
 intents = discord.Intents.default()
@@ -156,7 +178,7 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    slang_mapping = load_slang()
+    slang_mapping = load_slang_from_sheet(sheet_slang_mapping)
 
     if message.author == bot.user:
         return
@@ -170,14 +192,18 @@ async def on_message(message):
     # if response:
     #     await message.reply(response)
 
-    if message.content.lower().startswith("bot ngu:"):
-        response = update_slang_mapping(message.content)
+    if message.content.lower().startswith("bot ngu:"or "Bot ngu:"):
+        response = update_slang_mapping_to_sheet(message.content, sheet_slang_mapping)
         await message.reply(response)
-        slang_mapping = load_slang()
+        slang_mapping = load_slang_from_sheet(sheet_slang_mapping)
         return
     
     if message.content.lower().startswith("format"):
-        response = f"ℹ️ Người chi (hoặc để trống), hạng mục chi, số tiền, người nhận, ghi chú (hoặc để trống)."
+        response = f"ℹ️**Người chi** *(không cần ghi nếu dùng tài khoản của bạn)*, \n\
+        **Hạng mục chi**, \n\
+        **Số tiền**, \n\
+        **Người nhận**, \n\
+        **Ghi chú** *(không cần ghi nếu không có)*."
         await message.reply(response)
         return
 
@@ -201,26 +227,29 @@ async def on_message(message):
         
         # Nếu có 5 phần tử: người chi, hạng mục, số tiền, người nhận, ghi chú
         if len(content) == 5:
-            data['payer'] = replace_slang(content[0].title(), slang_mapping)
+            data['payer'] = replace_slang(content[0].lower(), slang_mapping).title()
             data['spending_category'] = content[1]
             data['amount'] = content[2]
+            content[3] = replace_slang(content[3].lower(), slang_mapping).title()
             data['recipients'] = content[3]
             data['note'] = content[4]
         # Nếu có 4 phần tử: có thể là [người chi, hạng mục, số tiền, người nhận] hoặc [hạng mục, số tiền, người nhận, ghi chú]
         elif len(content) == 4:
             know_names = slang_mapping.get("username", [])
-            content[0] = replace_slang(content[0].lower(), slang_mapping)
+            content[0] = replace_slang(content[0].lower(), slang_mapping).title()
             # Nếu phần tử đầu là tên người trong danh sách thì lấy làm payer
             if content[0].title() in know_names:
-                data['payer'] = content[0].title()
+                data['payer'] = content[0]
                 data['spending_category'] = content[1]
                 data['amount'] = content[2]
+                content[3] = replace_slang(content[3].lower(), slang_mapping).title()
                 data['recipients'] = content[3]
                 data['note'] = ""
             else:
                 data['payer'] = slang_mapping.get(message.author.name, message.author.name)
                 data['spending_category'] = content[0]
                 data['amount'] = content[1]
+                content[2] = replace_slang(content[2].lower(), slang_mapping).title()
                 data['recipients'] = content[2]
                 data['note'] = content[3]
         # Nếu có 3 phần tử: hạng mục, số tiền, người nhận
@@ -228,6 +257,7 @@ async def on_message(message):
             data['payer'] = slang_mapping.get(message.author.name, message.author.name)
             data['spending_category'] = content[0]
             data['amount'] = content[1]
+            content[2] = replace_slang(content[2].lower(), slang_mapping).title()
             data['recipients'] = content[2]
             data['note'] = ""
         # Nếu có 2 phần tử: hạng mục, số tiền
@@ -235,14 +265,11 @@ async def on_message(message):
             data['payer'] = slang_mapping.get(message.author.name, message.author.name)
             data['spending_category'] = content[0]
             data['amount'] = content[1]
-            data['recipients'] = ""
+            data['recipients'] = "Mọi Người"
             data['note'] = ""
         else:
-            data['payer'] = slang_mapping.get(message.author.name, message.author.name)
-            data['spending_category'] = content[0] if len(content) > 0 else ""
-            data['amount'] = content[1] if len(content) > 1 else ""
-            data['recipients'] = content[2] if len(content) > 2 else ""
-            data['note'] = content[3] if len(content) > 3 else ""
+            await message.reply("Cú pháp chưa đúng bro! Nhập đủ ít nhất 2 phần tử: hạng mục, số tiền nha!")
+            return
 
         data["amount"] = parse_amount(data['amount'], slang_mapping)[0]
 
@@ -274,19 +301,19 @@ async def on_message(message):
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # user = knowledge.username.get(message.author.name, message.author.name)
         
-        sheet.append_row([
+        sheet_log.append_row([
             now, data['spending_category'], data['amount'], data['payer'],
             data['recipients'].title(), ""
         ])
 
         await message.reply(
             f"✅ Đã ghi vào sheet:\n\
-                                Người chi: ***{data['payer']}***\n\
-                                Hạng mục chi: ***{data['spending_category']}***\n\
-                                Số tiền:"+f" ***{data['amount']:,}".replace(",",".")+f"đ***\n\
-                                Người Nhận: ***{data['recipients'].title()}***\n\
-                                Ghi chú: ***{data['note'] or 'Không có'}***\n\
-                                Xem file google sheet [***TẠI ĐÂY***](https://docs.google.com/spreadsheets/d/1HtiGGXWZ6II9X_L3BxUh60e13isLuOhWL6NR1wcwvVk/edit?gid=0#gid=0)"
+                    Người chi: ***{data['payer']}***\n\
+                    Hạng mục chi: ***{data['spending_category']}***\n\
+                    Số tiền:"+f" ***{data['amount']:,}".replace(",",".")+f"đ***\n\
+                    Người Nhận: ***{data['recipients'].title()}***\n\
+                    Ghi chú: ***{data['note'] or 'Không có'}***\n\
+                    Xem file google sheet [***TẠI ĐÂY***](https://docs.google.com/spreadsheets/d/1HtiGGXWZ6II9X_L3BxUh60e13isLuOhWL6NR1wcwvVk/edit?gid=0#gid=0)"
         )
 
     except Exception as e:
