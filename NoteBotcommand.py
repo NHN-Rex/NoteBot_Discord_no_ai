@@ -325,7 +325,7 @@ async def on_message(message):
 # Bot command gửi biểu đồ
 @bot.command()
 async def thongkechi(ctx, time=None):
-    data = sheet.get_all_values()
+    data = sheet_log.get_all_values()
     chart_pay = generate_chart_pay_by_month(data, time)
     if not chart_pay:
         await ctx.reply(f"Không có dữ liệu chi tiêu trong tháng {time}.")
@@ -342,7 +342,7 @@ async def thongkechi(ctx, time=None):
 @bot.command()
 async def thongkeno(ctx):
     user = ctx.author.name
-    data = sheet.get_all_values()
+    data = sheet_log.get_all_values()
     time = datetime.now().strftime("%m/%Y")
     chart_debt = generate_chart_debt(user, data)
     if not chart_debt:
