@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.ticker import FuncFormatter
 import pytz
+import matplotlib.image as mpimg
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+
 timezone = pytz.timezone("Asia/Ho_Chi_Minh")
 
 
@@ -154,57 +157,180 @@ def total_debt_by_person_in_month(data, month=None, year=None):
         return df_group_detail
 
 
-import knowledge
-
-def generate_chart_debt(name, data):
-    df_debt = total_debt_by_person_in_month(data)
-    name = knowledge.username.get(name, name)  # Lấy tên người từ dict nếu có
+# def generate_chart_debt(name, data):
+#     df_debt = total_debt_by_person_in_month(data)
     
-    # Người mà name nợ
+#     # Người mà name nợ
+#     df_person_r = df_debt[df_debt['Người nợ'] == name][['Chủ nợ', 'Số tiền']].copy()
+#     df_person_r.rename(columns={'Chủ nợ': 'Tên người'}, inplace=True)
+#     df_person_r['Giá trị'] = -df_person_r['Số tiền']  # Âm
+    
+#     # display(df_person_r)  # Hiển thị bảng người nợ
+
+#     # Người mà nợ name
+#     df_person_p = df_debt[df_debt['Chủ nợ'] == name][['Người nợ', 'Số tiền']].copy()
+#     df_person_p.rename(columns={'Người nợ': 'Tên người'}, inplace=True)
+#     df_person_p['Giá trị'] = df_person_p['Số tiền']  # Dương
+#     # display(df_person_p)
+
+#     # Gộp lại
+#     df_all = pd.concat([df_person_r[['Tên người', 'Giá trị']], df_person_p[['Tên người', 'Giá trị']]])
+    
+#     if df_all.empty:
+#         print(f"{name} không có khoản nợ nào.")
+#         return
+    
+#     plt.figure(figsize=(10,6))
+#     ax = sns.barplot(data=df_all, x='Tên người', y='Giá trị', color='skyblue', width=0.5)
+
+#     plt.title(f'Thống kê nợ của {name} đến {datetime.now(timezone).strftime("%d/%m/%Y")}')
+#     plt.ylabel('Số tiền (VNĐ)')
+#     plt.xlabel('')
+
+#     ax.axhline(0, color='black', linewidth=1)  # Đường mốc 0
+    
+#     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{int(x):,}'))
+
+#     # Hiện giá trị trên đầu cột
+#     for p in ax.patches:
+#         height = p.get_height()
+#         if height != 0:
+#             ax.text(p.get_x() + p.get_width()/2., height + (5_000 if height > 0 else -5_000),
+#                     f'{int(height):,}', ha='center', va='bottom' if height > 0 else 'top',
+#                     fontsize=9, color='black', fontweight='bold')
+            
+#     # plt.tight_layout()
+#     # plt.show()
+
+
+#     buf = BytesIO()
+#     plt.savefig(buf, format='png')
+#     buf.seek(0)
+#     plt.close()
+#     return buf
+
+
+
+
+
+def generate_chart_debt(name, data, icon_path='asset/bar-chart.png'):
+    df_debt = total_debt_by_person_in_month(data)
+    
     df_person_r = df_debt[df_debt['Người nợ'] == name][['Chủ nợ', 'Số tiền']].copy()
     df_person_r.rename(columns={'Chủ nợ': 'Tên người'}, inplace=True)
-    df_person_r['Giá trị'] = -df_person_r['Số tiền']  # Âm
-    
-    # display(df_person_r)  # Hiển thị bảng người nợ
+    df_person_r['Giá trị'] = -df_person_r['Số tiền']
 
-    # Người mà nợ name
     df_person_p = df_debt[df_debt['Chủ nợ'] == name][['Người nợ', 'Số tiền']].copy()
     df_person_p.rename(columns={'Người nợ': 'Tên người'}, inplace=True)
-    df_person_p['Giá trị'] = df_person_p['Số tiền']  # Dương
-    # display(df_person_p)
+    df_person_p['Giá trị'] = df_person_p['Số tiền']
 
-    # Gộp lại
     df_all = pd.concat([df_person_r[['Tên người', 'Giá trị']], df_person_p[['Tên người', 'Giá trị']]])
-    
+
     if df_all.empty:
         print(f"{name} không có khoản nợ nào.")
         return
-    
-    plt.figure(figsize=(10,6))
-    ax = sns.barplot(data=df_all, x='Tên người', y='Giá trị', palette='coolwarm', width=0.5)
 
-    plt.title(f'Thống kê nợ của {name} đến {datetime.now(timezone).strftime("%d/%m/%Y")}')
-    plt.ylabel('Số tiền (VNĐ)')
-    plt.xlabel('')
-
-    ax.axhline(0, color='black', linewidth=1)  # Đường mốc 0
+    fig, ax = plt.subplots(figsize=(10, 6))
     
+    # Tên người và giá trị
+    names = df_all['Tên người'].tolist()
+    values = df_all['Giá trị'].tolist()
+
+    # Vẽ biểu đồ
+    bars = ax.bar(names, values, color='skyblue', width=0.5)
+
+    ax.axhline(0, color='black', linewidth=1)
+
+    # Format trục y
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{int(x):,}'))
 
-    # Hiện giá trị trên đầu cột
-    for p in ax.patches:
-        height = p.get_height()
+    # Đặt tiêu đề chart
+    title_text = f"Thống kê nợ của {name} đến {datetime.now(timezone).strftime('%d/%m/%Y')}"
+    title = plt.title(title_text, fontsize=18, color='black', pad=20)
+
+    # Thêm số tiền lên đầu cột
+    for bar in bars:
+        height = bar.get_height()
         if height != 0:
-            ax.text(p.get_x() + p.get_width()/2., height + (5_000 if height > 0 else -5_000),
-                    f'{int(height):,}', ha='center', va='bottom' if height > 0 else 'top',
+            offset = 5_000 if height > 0 else -5_000
+            va = 'bottom' if height > 0 else 'top'
+            ax.text(bar.get_x() + bar.get_width()/2, height + offset,
+                    f'{int(height):,}', ha='center', va=va,
                     fontsize=9, color='black', fontweight='bold')
-            
-    # plt.tight_layout()
-    # plt.show()
+
+    # Thêm icon PNG vào bên trái title
+    renderer = fig.canvas.get_renderer()
+    fig.canvas.draw()  # cần render trước để lấy bbox chính xác
+    title_bbox = title.get_window_extent(renderer=renderer)
+
+    icon = mpimg.imread(icon_path)
+    imagebox = OffsetImage(icon, zoom=0.4)
+
+    icon_x = (title_bbox.x0 - 10) / fig.bbox.width
+    icon_y = (title_bbox.y0 + 7 + title_bbox.height / 2) / fig.bbox.height
 
 
+    ab = AnnotationBbox(imagebox, (icon_x, icon_y), xycoords='figure fraction', frameon=False)
+    fig.add_artist(ab)
+
+    plt.tight_layout()
+
+    # Lưu vào buffer
     buf = BytesIO()
-    plt.savefig(buf, format='png')
+    plt.savefig(buf, format='png', dpi=150)
     buf.seek(0)
     plt.close()
+
     return buf
+
+
+# def generate_chart_debt(name, data):
+#     df_debt = total_debt_by_person_in_month(data)
+    
+#     df_person_r = df_debt[df_debt['Người nợ'] == name][['Chủ nợ', 'Số tiền']].copy()
+#     df_person_r.rename(columns={'Chủ nợ': 'Tên người'}, inplace=True)
+#     df_person_r['Giá trị'] = -df_person_r['Số tiền']
+
+#     df_person_p = df_debt[df_debt['Chủ nợ'] == name][['Người nợ', 'Số tiền']].copy()
+#     df_person_p.rename(columns={'Người nợ': 'Tên người'}, inplace=True)
+#     df_person_p['Giá trị'] = df_person_p['Số tiền']
+
+#     df_all = pd.concat([df_person_r[['Tên người', 'Giá trị']], df_person_p[['Tên người', 'Giá trị']]])
+
+#     if df_all.empty:
+#         print(f"{name} không có khoản nợ nào.")
+#         return
+
+#     plt.figure(figsize=(10, 6))
+    
+#     # Tên người và giá trị
+#     names = df_all['Tên người'].tolist()
+#     values = df_all['Giá trị'].tolist()
+
+#     # Vẽ biểu đồ
+#     bars = plt.bar(names, values, color='skyblue', width=0.5)
+
+#     plt.axhline(0, color='black', linewidth=1)
+
+#     # Format trục y
+#     plt.gca().yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{int(x):,}'))
+
+#     # plt.title(f'📊 Thống kê nợ của {name} đến {datetime.now(timezone).strftime("%d/%m/%Y")}\n', fontdict={'fontsize': 16, 'color': 'black', 'fontname': 'Segoe UI Emoji'})
+#     plt.title(f"💸 Thống kê nợ của {name} đến {datetime.now(timezone).strftime('%d/%m/%Y')}",
+#           fontsize=18, color='black', fontname='Segoe UI Symbol', pad=15)
+#     # Thêm số tiền lên đầu cột
+#     for bar in bars:
+#         height = bar.get_height()
+#         if height != 0:
+#             offset = 5_000 if height > 0 else -5_000
+#             va = 'bottom' if height > 0 else 'top'
+#             plt.text(bar.get_x() + bar.get_width()/2, height + offset,
+#                      f'{int(height):,}', ha='center', va=va,
+#                      fontsize=9, color='black', fontweight='bold')
+
+#     buf = BytesIO()
+#     plt.savefig(buf, format='png')
+#     buf.seek(0)
+#     plt.close()
+
+#     return buf

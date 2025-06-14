@@ -145,6 +145,7 @@ client_gs = gspread.authorize(creds)
 sheet = client_gs.open("chi_tieu_on_dinh")
 sheet_log = sheet.worksheet('log')
 sheet_slang_mapping = sheet.worksheet('slang_mapping')
+slang_mapping = load_slang_from_sheet(sheet_slang_mapping)
 
 # Bot setup
 intents = discord.Intents.default()
@@ -178,7 +179,6 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    slang_mapping = load_slang_from_sheet(sheet_slang_mapping)
 
     if message.author == bot.user:
         return
@@ -188,11 +188,25 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
+    if message.content.lower().startswith("thống kê nợ"):
+        user = message.author.name
+        slang_mapping = load_slang_from_sheet(sheet_slang_mapping)
+        name = replace_slang(user, slang_mapping)
+        data = sheet_log.get_all_values()
+        time = datetime.now().strftime("%m/%Y")
+        chart_debt = generate_chart_debt(name, data)
+        if not chart_debt:
+            await message.reply(f"{name} Không có dữ liệu.")
+            return
+        await message.reply(f"📊 Thống kê nợ đến tháng {time}:",
+                        file=discord.File(chart_debt, 'chart.png'))
+        return
+
     # response = handle_message(message.content)
     # if response:
     #     await message.reply(response)
 
-    if message.content.lower().startswith("bot ngu:"or "Bot ngu:"):
+    if message.content.lower().startswith("bot ngu:"):
         response = update_slang_mapping_to_sheet(message.content, sheet_slang_mapping)
         await message.reply(response)
         slang_mapping = load_slang_from_sheet(sheet_slang_mapping)
@@ -342,11 +356,12 @@ async def thongkechi(ctx, time=None):
 @bot.command()
 async def thongkeno(ctx):
     user = ctx.author.name
+    name = replace_slang(user, slang_mapping)
     data = sheet_log.get_all_values()
     time = datetime.now().strftime("%m/%Y")
-    chart_debt = generate_chart_debt(user, data)
+    chart_debt = generate_chart_debt(name, data)
     if not chart_debt:
-        await ctx.reply(f"{user} Không có dữ liệu.")
+        await ctx.reply(f"{name} Không có dữ liệu.")
         return
     await ctx.reply(f"📊 Thống kê nợ đến tháng {time}:",
                     file=discord.File(chart_debt, 'chart.png'))
