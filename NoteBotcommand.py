@@ -19,6 +19,26 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+# Google Sheets setup
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
+
+
+# sử dụng trên render
+# Lấy nội dung JSON từ biến môi trường
+credentials_info = os.getenv("GOOGLE_CREDENTIALS_JSON")
+# Parse string JSON thành dict
+credentials_dict = json.loads(credentials_info)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
+client_gs = gspread.authorize(creds)
+
+# # sử dụng local
+# creds = ServiceAccountCredentials.from_json_keyfile_name(
+#     "credentials.json", scope)
+# client_gs = gspread.authorize(creds)
+
 # Load slang mapping
 def load_slang_from_sheet(slang_sheet):
     rows = slang_sheet.get_all_records()
@@ -121,26 +141,6 @@ def parse_amount(amount_text, slang_mapping):
                 total_amount += int(base_amount)
 
     return total_amount, None
-# Google Sheets setup
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive"
-]
-
-
-# sử dụng trên render
-# Lấy nội dung JSON từ biến môi trường
-credentials_info = os.getenv("GOOGLE_CREDENTIALS_JSON")
-# Parse string JSON thành dict
-credentials_dict = json.loads(credentials_info)
-creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
-client_gs = gspread.authorize(creds)
-
-# # sử dụng local
-# creds = ServiceAccountCredentials.from_json_keyfile_name(
-#     "credentials.json", scope)
-# client_gs = gspread.authorize(creds)
-
 
 sheet = client_gs.open("chi_tieu_on_dinh")
 sheet_log = sheet.worksheet('log')
@@ -179,7 +179,7 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-
+    global slang_mapping
     if message.author == bot.user:
         return
 
