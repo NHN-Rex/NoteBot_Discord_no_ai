@@ -317,7 +317,7 @@ async def on_message(message):
         
         sheet_log.append_row([
             now, data['spending_category'], data['amount'], data['payer'],
-            data['recipients'].title(), ""
+            data['recipients'].title(), data['note']
         ])
 
         await message.reply(
