@@ -180,6 +180,7 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     global slang_mapping
+    slang_mapping = load_slang_from_sheet(sheet_slang_mapping)
     if message.author == bot.user:
         return
 
@@ -190,7 +191,7 @@ async def on_message(message):
 
     if message.content.lower().startswith("thống kê nợ"):
         user = message.author.name
-        slang_mapping = load_slang_from_sheet(sheet_slang_mapping)
+        # slang_mapping = load_slang_from_sheet(sheet_slang_mapping)
         name = replace_slang(user, slang_mapping)
         data = sheet_log.get_all_values()
         time = datetime.now().strftime("%m/%Y")
@@ -209,7 +210,7 @@ async def on_message(message):
     if message.content.lower().startswith("bot ngu:"):
         response = update_slang_mapping_to_sheet(message.content, sheet_slang_mapping)
         await message.reply(response)
-        slang_mapping = load_slang_from_sheet(sheet_slang_mapping)
+        # slang_mapping = load_slang_from_sheet(sheet_slang_mapping)
         return
     
     if message.content.lower().startswith("format"):
